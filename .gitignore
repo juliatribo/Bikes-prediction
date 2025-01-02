@@ -1,7 +1,7 @@
 # api keys
 data/hopsworks-api-key.txt
-data/aqi-api-key.txt
-data/bikes_nov.csv
+data/bicing-api-key.txt
+data/bikes_oct.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
