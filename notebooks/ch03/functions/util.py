@@ -33,7 +33,7 @@ def get_historical_weather(city, start_date,  end_date, latitude, longitude):
         "longitude": longitude,
         "start_date": start_date,
         "end_date": end_date,
-        "daily": ["temperature_2m_mean", "precipitation_sum", "wind_speed_10m_max", "wind_direction_10m_dominant"]
+        "hourly": ["precipitation", "wind_speed_10m"],
     }
     responses = openmeteo.weather_api(url, params=params)
 
@@ -44,28 +44,23 @@ def get_historical_weather(city, start_date,  end_date, latitude, longitude):
     print(f"Timezone {response.Timezone()} {response.TimezoneAbbreviation()}")
     print(f"Timezone difference to GMT+0 {response.UtcOffsetSeconds()} s")
 
-    # Process daily data. The order of variables needs to be the same as requested.
-    daily = response.Daily()
-    daily_temperature_2m_mean = daily.Variables(0).ValuesAsNumpy()
-    daily_precipitation_sum = daily.Variables(1).ValuesAsNumpy()
-    daily_wind_speed_10m_max = daily.Variables(2).ValuesAsNumpy()
-    daily_wind_direction_10m_dominant = daily.Variables(3).ValuesAsNumpy()
+    hourly = response.Hourly()
+    hourly_precipitation = hourly.Variables(0).ValuesAsNumpy()
+    hourly_wind_speed_100m = hourly.Variables(1).ValuesAsNumpy()
 
-    daily_data = {"date": pd.date_range(
-        start=pd.to_datetime(daily.Time(), unit="s"),
-        end=pd.to_datetime(daily.TimeEnd(), unit="s"),
-        freq=pd.Timedelta(seconds=daily.Interval()),
+    hourly_data = {"date": pd.date_range(
+        start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
+        end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
+        freq=pd.Timedelta(seconds=hourly.Interval()),
         inclusive="left"
     )}
-    daily_data["temperature_2m_mean"] = daily_temperature_2m_mean
-    daily_data["precipitation_sum"] = daily_precipitation_sum
-    daily_data["wind_speed_10m_max"] = daily_wind_speed_10m_max
-    daily_data["wind_direction_10m_dominant"] = daily_wind_direction_10m_dominant
+    hourly_data["precipitation"] = hourly_precipitation
+    hourly_data["wind_speed_10m"] = hourly_wind_speed_100m
 
-    daily_dataframe = pd.DataFrame(data=daily_data)
-    daily_dataframe = daily_dataframe.dropna()
-    daily_dataframe['city'] = city
-    return daily_dataframe
+    hourly_dataframe = pd.DataFrame(data=hourly_data)
+    hourly_dataframe = hourly_dataframe.dropna()
+    hourly_dataframe['city'] = city
+    return hourly_dataframe
 
 
 def get_hourly_weather_forecast(city, latitude, longitude):
