@@ -17,11 +17,11 @@ from pathlib import Path
 import urllib.request
 
 
-def get_historical_weather(city, start_date,  end_date, latitude, longitude):
+def get_historical_weather(city, start_date, end_date, latitude, longitude):
     # latitude, longitude = get_city_coordinates(city)
 
     # Setup the Open-Meteo API client with cache and retry on error
-    cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
+    cache_session = requests_cache.CachedSession(".cache", expire_after=-1)
     retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
     openmeteo = openmeteo_requests.Client(session=retry_session)
 
@@ -33,7 +33,7 @@ def get_historical_weather(city, start_date,  end_date, latitude, longitude):
         "longitude": longitude,
         "start_date": start_date,
         "end_date": end_date,
-        "hourly": ["precipitation", "wind_speed_10m"],
+        "hourly": ["precipitation", "temperature_2m"],
     }
     responses = openmeteo.weather_api(url, params=params)
 
@@ -46,20 +46,22 @@ def get_historical_weather(city, start_date,  end_date, latitude, longitude):
 
     hourly = response.Hourly()
     hourly_precipitation = hourly.Variables(0).ValuesAsNumpy()
-    hourly_wind_speed_100m = hourly.Variables(1).ValuesAsNumpy()
+    temperature_2m_mean = hourly.Variables(1).ValuesAsNumpy()
 
-    hourly_data = {"date": pd.date_range(
-        start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
-        end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
-        freq=pd.Timedelta(seconds=hourly.Interval()),
-        inclusive="left"
-    )}
+    hourly_data = {
+        "date": pd.date_range(
+            start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
+            end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
+            freq=pd.Timedelta(seconds=hourly.Interval()),
+            inclusive="left",
+        )
+    }
     hourly_data["precipitation"] = hourly_precipitation
-    hourly_data["wind_speed_10m"] = hourly_wind_speed_100m
+    hourly_data["temperature"] = temperature_2m_mean
 
     hourly_dataframe = pd.DataFrame(data=hourly_data)
     hourly_dataframe = hourly_dataframe.dropna()
-    hourly_dataframe['city'] = city
+    hourly_dataframe["city"] = city
     return hourly_dataframe
 
 
@@ -68,7 +70,7 @@ def get_hourly_weather_forecast(city, latitude, longitude):
     # latitude, longitude = get_city_coordinates(city)
 
     # Setup the Open-Meteo API client with cache and retry on error
-    cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
+    cache_session = requests_cache.CachedSession(".cache", expire_after=3600)
     retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
     openmeteo = openmeteo_requests.Client(session=retry_session)
 
@@ -78,7 +80,12 @@ def get_hourly_weather_forecast(city, latitude, longitude):
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "hourly": ["temperature_2m", "precipitation", "wind_speed_10m", "wind_direction_10m"]
+        "hourly": [
+            "temperature_2m",
+            "precipitation",
+            "wind_speed_10m",
+            "wind_direction_10m",
+        ],
     }
     responses = openmeteo.weather_api(url, params=params)
 
@@ -97,12 +104,14 @@ def get_hourly_weather_forecast(city, latitude, longitude):
     hourly_wind_speed_10m = hourly.Variables(2).ValuesAsNumpy()
     hourly_wind_direction_10m = hourly.Variables(3).ValuesAsNumpy()
 
-    hourly_data = {"date": pd.date_range(
-        start=pd.to_datetime(hourly.Time(), unit="s"),
-        end=pd.to_datetime(hourly.TimeEnd(), unit="s"),
-        freq=pd.Timedelta(seconds=hourly.Interval()),
-        inclusive="left"
-    )}
+    hourly_data = {
+        "date": pd.date_range(
+            start=pd.to_datetime(hourly.Time(), unit="s"),
+            end=pd.to_datetime(hourly.TimeEnd(), unit="s"),
+            freq=pd.Timedelta(seconds=hourly.Interval()),
+            inclusive="left",
+        )
+    }
     hourly_data["temperature_2m_mean"] = hourly_temperature_2m
     hourly_data["precipitation_sum"] = hourly_precipitation
     hourly_data["wind_speed_10m_max"] = hourly_wind_speed_10m
@@ -139,7 +148,14 @@ def trigger_request(url: str):
     return data
 
 
-def get_pm25(aqicn_url: str, country: str, city: str, street: str, day: datetime.date, AQI_API_KEY: str):
+def get_pm25(
+    aqicn_url: str,
+    country: str,
+    city: str,
+    street: str,
+    day: datetime.date,
+    AQI_API_KEY: str,
+):
     """
     Returns DataFrame with air quality (pm25) as dataframe
     """
@@ -150,68 +166,93 @@ def get_pm25(aqicn_url: str, country: str, city: str, street: str, day: datetime
     data = trigger_request(url)
 
     # if we get 'Unknown station' response then retry with city in url
-    if data['data'] == "Unknown station":
+    if data["data"] == "Unknown station":
         url1 = f"https://api.waqi.info/feed/{country}/{street}/?token={AQI_API_KEY}"
         data = trigger_request(url1)
 
-    if data['data'] == "Unknown station":
-        url2 = f"https://api.waqi.info/feed/{country}/{city}/{street}/?token={AQI_API_KEY}"
+    if data["data"] == "Unknown station":
+        url2 = (
+            f"https://api.waqi.info/feed/{country}/{city}/{street}/?token={AQI_API_KEY}"
+        )
         data = trigger_request(url2)
 
     # Check if the API response contains the data
-    if data['status'] == 'ok':
+    if data["status"] == "ok":
         # Extract the air quality data
-        aqi_data = data['data']
+        aqi_data = data["data"]
         aq_today_df = pd.DataFrame()
-        aq_today_df['pm25'] = [aqi_data['iaqi'].get('pm25', {}).get('v', None)]
-        aq_today_df['pm25'] = aq_today_df['pm25'].astype('float32')
+        aq_today_df["pm25"] = [aqi_data["iaqi"].get("pm25", {}).get("v", None)]
+        aq_today_df["pm25"] = aq_today_df["pm25"].astype("float32")
 
-        aq_today_df['country'] = country
-        aq_today_df['city'] = city
-        aq_today_df['street'] = street
-        aq_today_df['date'] = day
-        aq_today_df['date'] = pd.to_datetime(aq_today_df['date'])
-        aq_today_df['url'] = aqicn_url
+        aq_today_df["country"] = country
+        aq_today_df["city"] = city
+        aq_today_df["street"] = street
+        aq_today_df["date"] = day
+        aq_today_df["date"] = pd.to_datetime(aq_today_df["date"])
+        aq_today_df["url"] = aqicn_url
     else:
         print(
-            "Error: There may be an incorrect  URL for your Sensor or it is not contactable right now. The API response does not contain data.  Error message:", data['data'])
-        raise requests.exceptions.RequestException(data['data'])
+            "Error: There may be an incorrect  URL for your Sensor or it is not contactable right now. The API response does not contain data.  Error message:",
+            data["data"],
+        )
+        raise requests.exceptions.RequestException(data["data"])
 
     return aq_today_df
 
 
-def plot_air_quality_forecast(city: str, street: str, df: pd.DataFrame, file_path: str, hindcast=False):
+def plot_air_quality_forecast(
+    city: str, street: str, df: pd.DataFrame, file_path: str, hindcast=False
+):
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    day = pd.to_datetime(df['date']).dt.date
+    day = pd.to_datetime(df["date"]).dt.date
     # Plot each column separately in matplotlib
-    ax.plot(day, df['predicted_pm25'], label='Predicted PM2.5', color='red',
-            linewidth=2, marker='o', markersize=5, markerfacecolor='blue')
+    ax.plot(
+        day,
+        df["predicted_pm25"],
+        label="Predicted PM2.5",
+        color="red",
+        linewidth=2,
+        marker="o",
+        markersize=5,
+        markerfacecolor="blue",
+    )
 
     # Set the y-axis to a logarithmic scale
-    ax.set_yscale('log')
+    ax.set_yscale("log")
     ax.set_yticks([0, 10, 25, 50, 100, 250, 500])
     ax.get_yaxis().set_major_formatter(plt.ScalarFormatter())
     ax.set_ylim(bottom=1)
 
     # Set the labels and title
-    ax.set_xlabel('Date')
+    ax.set_xlabel("Date")
     ax.set_title(f"PM2.5 Predicted (Logarithmic Scale) for {city}, {street}")
-    ax.set_ylabel('PM2.5')
+    ax.set_ylabel("PM2.5")
 
-    colors = ['green', 'yellow', 'orange', 'red', 'purple', 'darkred']
-    labels = ['Good', 'Moderate', 'Unhealthy for Some',
-              'Unhealthy', 'Very Unhealthy', 'Hazardous']
-    ranges = [(0, 49), (50, 99), (100, 149),
-              (150, 199), (200, 299), (300, 500)]
+    colors = ["green", "yellow", "orange", "red", "purple", "darkred"]
+    labels = [
+        "Good",
+        "Moderate",
+        "Unhealthy for Some",
+        "Unhealthy",
+        "Very Unhealthy",
+        "Hazardous",
+    ]
+    ranges = [(0, 49), (50, 99), (100, 149), (150, 199), (200, 299), (300, 500)]
     for color, (start, end) in zip(colors, ranges):
         ax.axhspan(start, end, color=color, alpha=0.3)
 
     # Add a legend for the different Air Quality Categories
-    patches = [Patch(
-        color=colors[i], label=f"{labels[i]}: {ranges[i][0]}-{ranges[i][1]}") for i in range(len(colors))]
-    legend1 = ax.legend(handles=patches, loc='upper right',
-                        title="Air Quality Categories", fontsize='x-small')
+    patches = [
+        Patch(color=colors[i], label=f"{labels[i]}: {ranges[i][0]}-{ranges[i][1]}")
+        for i in range(len(colors))
+    ]
+    legend1 = ax.legend(
+        handles=patches,
+        loc="upper right",
+        title="Air Quality Categories",
+        fontsize="x-small",
+    )
 
     # Aim for ~10 annotated values on x-axis, will work for both forecasts ans hindcasts
     if len(df.index) > 11:
@@ -221,9 +262,17 @@ def plot_air_quality_forecast(city: str, street: str, df: pd.DataFrame, file_pat
     plt.xticks(rotation=45)
 
     if hindcast == True:
-        ax.plot(day, df['pm25'], label='Actual PM2.5', color='black',
-                linewidth=2, marker='^', markersize=5, markerfacecolor='grey')
-        legend2 = ax.legend(loc='upper left', fontsize='x-small')
+        ax.plot(
+            day,
+            df["pm25"],
+            label="Actual PM2.5",
+            color="black",
+            linewidth=2,
+            marker="^",
+            markersize=5,
+            markerfacecolor="grey",
+        )
+        legend2 = ax.legend(loc="upper left", fontsize="x-small")
         ax.add_artist(legend1)
 
     # Ensure everything is laid out neatly
@@ -270,6 +319,7 @@ def delete_secrets(proj, name):
     except hopsworks.client.exceptions.RestAPIError:
         print(f"No {name} secret found")
 
+
 # WARNING - this will wipe out all your feature data and models
 
 
@@ -300,15 +350,24 @@ def check_file_path(file_path):
 
 def backfill_predictions_for_monitoring(weather_fg, air_quality_df, monitor_fg, model):
     features_df = weather_fg.read()
-    features_df = features_df.sort_values(by=['date'], ascending=True)
+    features_df = features_df.sort_values(by=["date"], ascending=True)
     features_df = features_df.tail(10)
-    features_df['predicted_pm25'] = model.predict(
-        features_df[['temperature_2m_mean', 'precipitation_sum', 'wind_speed_10m_max', 'wind_direction_10m_dominant']])
-    df = pd.merge(features_df, air_quality_df[[
-                  'date', 'pm25', 'street', 'country']], on="date")
-    df['days_before_forecast_day'] = 1
+    features_df["predicted_pm25"] = model.predict(
+        features_df[
+            [
+                "temperature_2m_mean",
+                "precipitation_sum",
+                "wind_speed_10m_max",
+                "wind_direction_10m_dominant",
+            ]
+        ]
+    )
+    df = pd.merge(
+        features_df, air_quality_df[["date", "pm25", "street", "country"]], on="date"
+    )
+    df["days_before_forecast_day"] = 1
     hindcast_df = df
-    df = df.drop('pm25', axis=1)
+    df = df.drop("pm25", axis=1)
     monitor_fg.insert(df, write_options={"wait_for_job": True})
     return hindcast_df
 
@@ -318,7 +377,7 @@ def fetch_station_data(url, authorization_token, target_station_id=42):
     Returns DataFrame with station data for a specific station ID.
     """
     request = urllib.request.Request(url)
-    request.add_header('Authorization', authorization_token)
+    request.add_header("Authorization", authorization_token)
 
     with urllib.request.urlopen(request) as response:
         data = response.read()
@@ -326,23 +385,28 @@ def fetch_station_data(url, authorization_token, target_station_id=42):
         try:
             stations_data = json.loads(data)
 
-            if 'data' in stations_data and 'stations' in stations_data['data']:
-                stations = stations_data['data']['stations']
+            if "data" in stations_data and "stations" in stations_data["data"]:
+                stations = stations_data["data"]["stations"]
 
                 filtered_station = next(
-                    (s for s in stations if s['station_id'] == target_station_id), None)
+                    (s for s in stations if s["station_id"] == target_station_id), None
+                )
 
                 if filtered_station:
-                    reported = filtered_station['last_reported']
+                    reported = filtered_station["last_reported"]
                     readable_reported = datetime.datetime.fromtimestamp(
                         reported, datetime.timezone.utc
-                    ).strftime('%Y-%m-%d %H:%M:%S UTC')
+                    ).strftime("%Y-%m-%d %H:%M:%S UTC")
 
-                    station_df = pd.DataFrame({
-                        'station_id': [filtered_station['station_id']],
-                        'num_bikes_available': [filtered_station['num_bikes_available']],
-                        'last_reported': [readable_reported],
-                    })
+                    station_df = pd.DataFrame(
+                        {
+                            "station_id": [filtered_station["station_id"]],
+                            "num_bikes_available": [
+                                filtered_station["num_bikes_available"]
+                            ],
+                            "last_reported": [readable_reported],
+                        }
+                    )
                     return station_df
                 else:
                     print(f"Station ID {target_station_id} not found.")
