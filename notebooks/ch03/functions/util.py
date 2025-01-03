@@ -58,6 +58,7 @@ def get_historical_weather(city, start_date, end_date, latitude, longitude):
     }
     hourly_data["precipitation"] = hourly_precipitation
     hourly_data["temperature"] = temperature_2m_mean
+    hourly_data["date"] = pd.to_datetime(hourly_data["date"])
 
     hourly_dataframe = pd.DataFrame(data=hourly_data)
     hourly_dataframe = hourly_dataframe.dropna()
@@ -83,8 +84,6 @@ def get_hourly_weather_forecast(city, latitude, longitude):
         "hourly": [
             "temperature_2m",
             "precipitation",
-            "wind_speed_10m",
-            "wind_direction_10m",
         ],
     }
     responses = openmeteo.weather_api(url, params=params)
@@ -101,8 +100,6 @@ def get_hourly_weather_forecast(city, latitude, longitude):
     hourly = response.Hourly()
     hourly_temperature_2m = hourly.Variables(0).ValuesAsNumpy()
     hourly_precipitation = hourly.Variables(1).ValuesAsNumpy()
-    hourly_wind_speed_10m = hourly.Variables(2).ValuesAsNumpy()
-    hourly_wind_direction_10m = hourly.Variables(3).ValuesAsNumpy()
 
     hourly_data = {
         "date": pd.date_range(
@@ -112,10 +109,9 @@ def get_hourly_weather_forecast(city, latitude, longitude):
             inclusive="left",
         )
     }
-    hourly_data["temperature_2m_mean"] = hourly_temperature_2m
-    hourly_data["precipitation_sum"] = hourly_precipitation
-    hourly_data["wind_speed_10m_max"] = hourly_wind_speed_10m
-    hourly_data["wind_direction_10m_dominant"] = hourly_wind_direction_10m
+    hourly_data["temperature"] = hourly_temperature_2m
+    hourly_data["precipitation"] = hourly_precipitation
+    hourly_data["date"] = pd.to_datetime(hourly_data["date"])
 
     hourly_dataframe = pd.DataFrame(data=hourly_data)
     hourly_dataframe = hourly_dataframe.dropna()
@@ -394,9 +390,6 @@ def fetch_station_data(url, authorization_token, target_station_id=42):
 
                 if filtered_station:
                     reported = filtered_station["last_reported"]
-                    readable_reported = datetime.datetime.fromtimestamp(
-                        reported, datetime.timezone.utc
-                    ).strftime("%Y-%m-%d %H:%M:%S UTC")
 
                     station_df = pd.DataFrame(
                         {
@@ -404,8 +397,11 @@ def fetch_station_data(url, authorization_token, target_station_id=42):
                             "num_bikes_available": [
                                 filtered_station["num_bikes_available"]
                             ],
-                            "last_reported": [readable_reported],
+                            "last_reported": reported,
                         }
+                    )
+                    station_df["last_reported"] = pd.to_datetime(
+                        station_df["last_reported"], unit="s", utc=True, errors="coerce"
                     )
                     return station_df
                 else:
