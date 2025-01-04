@@ -214,8 +214,8 @@ def plot_bikes_prediction(
         markerfacecolor="blue",
     )
 
-    # Set the y-axis to a logarithmic scale
-    ax.set_yscale("log")
+    # Set the y-axis to a linear scale
+    ax.set_yscale("linear")
     ax.set_yticks([0, 10, 25])
     ax.get_yaxis().set_major_formatter(plt.ScalarFormatter())
     ax.set_ylim(bottom=1)
