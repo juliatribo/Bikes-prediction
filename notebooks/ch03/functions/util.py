@@ -196,8 +196,8 @@ def get_pm25(
     return aq_today_df
 
 
-def plot_air_quality_forecast(
-    city: str, street: str, df: pd.DataFrame, file_path: str, hindcast=False
+def plot_bikes_prediction(
+    df: pd.DataFrame, file_path: str, hindcast=False
 ):
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -205,8 +205,8 @@ def plot_air_quality_forecast(
     # Plot each column separately in matplotlib
     ax.plot(
         day,
-        df["predicted_pm25"],
-        label="Predicted PM2.5",
+        df["num_bikes_available"],
+        label="Predicted bikes",
         color="red",
         linewidth=2,
         marker="o",
@@ -216,37 +216,37 @@ def plot_air_quality_forecast(
 
     # Set the y-axis to a logarithmic scale
     ax.set_yscale("log")
-    ax.set_yticks([0, 10, 25, 50, 100, 250, 500])
+    ax.set_yticks([0, 10, 25])
     ax.get_yaxis().set_major_formatter(plt.ScalarFormatter())
     ax.set_ylim(bottom=1)
 
     # Set the labels and title
     ax.set_xlabel("Date")
-    ax.set_title(f"PM2.5 Predicted (Logarithmic Scale) for {city}, {street}")
-    ax.set_ylabel("PM2.5")
+    ax.set_title(
+        f"Bikes prediction in station C/ CIUTAT DE GRANADA, 168 | AV. DIAGONAL")
+    ax.set_ylabel("Bikes")
 
-    colors = ["green", "yellow", "orange", "red", "purple", "darkred"]
+    colors = ["red", "orange", "yellow", "green"]
     labels = [
-        "Good",
-        "Moderate",
-        "Unhealthy for Some",
-        "Unhealthy",
-        "Very Unhealthy",
-        "Hazardous",
+        "Few",
+        "Some",
+        "Several",
+        "Many",
     ]
-    ranges = [(0, 49), (50, 99), (100, 149), (150, 199), (200, 299), (300, 500)]
+    ranges = [(0, 5), (5, 10), (10, 15), (15, 25)]
     for color, (start, end) in zip(colors, ranges):
         ax.axhspan(start, end, color=color, alpha=0.3)
 
     # Add a legend for the different Air Quality Categories
     patches = [
-        Patch(color=colors[i], label=f"{labels[i]}: {ranges[i][0]}-{ranges[i][1]}")
+        Patch(color=colors[i],
+              label=f"{labels[i]}: {ranges[i][0]}-{ranges[i][1]}")
         for i in range(len(colors))
     ]
     legend1 = ax.legend(
         handles=patches,
         loc="upper right",
-        title="Air Quality Categories",
+        title="Bikes prediction",
         fontsize="x-small",
     )
 
@@ -260,8 +260,8 @@ def plot_air_quality_forecast(
     if hindcast == True:
         ax.plot(
             day,
-            df["pm25"],
-            label="Actual PM2.5",
+            df["num_bikes_available"],
+            label="Actual number of bikes",
             color="black",
             linewidth=2,
             marker="^",
@@ -359,7 +359,8 @@ def backfill_predictions_for_monitoring(weather_fg, air_quality_df, monitor_fg, 
         ]
     )
     df = pd.merge(
-        features_df, air_quality_df[["date", "pm25", "street", "country"]], on="date"
+        features_df, air_quality_df[[
+            "date", "pm25", "street", "country"]], on="date"
     )
     df["days_before_forecast_day"] = 1
     hindcast_df = df
@@ -385,7 +386,8 @@ def fetch_station_data(url, authorization_token, target_station_id=42):
                 stations = stations_data["data"]["stations"]
 
                 filtered_station = next(
-                    (s for s in stations if s["station_id"] == target_station_id), None
+                    (s for s in stations if s["station_id"]
+                     == target_station_id), None
                 )
 
                 if filtered_station:
