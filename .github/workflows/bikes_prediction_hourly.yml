@@ -1,9 +1,10 @@
-name: air-quality-daily
+name: bikes_prediction_hourly
 
 on:
   workflow_dispatch:
-    #schedule:
-    #- cron: '11 6 * * *'
+  schedule:
+    - cron: '10 * * * *'
+
 
 jobs:
   schedule_pipelines:
@@ -39,10 +40,10 @@ jobs:
       - name: github pages publish
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Air Quality Dashboard published"
+          commit_message: "Bikes Prediction Dashboard published"
           commit_options: '--no-verify --signoff'
 
-          file_pattern: 'docs/air-quality/assets/img/* docs/_includes/*'
+          file_pattern: 'docs/bikes/assets/img/* docs/_includes/*'
 
           repository: .
 
