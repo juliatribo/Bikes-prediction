@@ -21,3 +21,5 @@ matplotlib==3.8.3
 great_expectations
 pyarrow
 holidays
+
+jupyter
