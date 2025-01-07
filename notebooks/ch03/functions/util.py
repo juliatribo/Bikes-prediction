@@ -205,7 +205,7 @@ def plot_bikes_prediction(
     # Plot each column separately in matplotlib
     ax.plot(
         day,
-        df["num_bikes_available"],
+        df["predicted_num_bikes_available"],
         label="Predicted bikes",
         color="red",
         linewidth=2,
@@ -344,22 +344,19 @@ def check_file_path(file_path):
         print(f"File successfully found at the path: {file_path}")
 
 
-def backfill_predictions_for_monitoring(weather_fg, air_quality_df, monitor_fg, model):
+def backfill_predictions_for_monitoring(weather_fg, bikes_df, monitor_fg, model):
     features_df = weather_fg.read()
     features_df = features_df.sort_values(by=["date"], ascending=True)
     features_df = features_df.tail(10)
-    features_df["predicted_pm25"] = model.predict(
+    features_df["predicted_num_bikes_available"] = model.predict(
         features_df[
             [
-                "temperature_2m_mean",
-                "precipitation_sum",
-                "wind_speed_10m_max",
-                "wind_direction_10m_dominant",
+                'is_weekend', 'is_holiday', 'prev_num_bikes_available', 'precipitation', 'temperature', 'time'
             ]
         ]
     )
     df = pd.merge(
-        features_df, air_quality_df[[
+        features_df, bikes_df[[
             "date", "pm25", "street", "country"]], on="date"
     )
     df["days_before_forecast_day"] = 1
