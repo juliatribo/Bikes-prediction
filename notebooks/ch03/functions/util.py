@@ -196,12 +196,11 @@ def get_pm25(
     return aq_today_df
 
 
-def plot_bikes_prediction(
-    df: pd.DataFrame, file_path: str, hindcast=False
-):
+def plot_bikes_prediction(df: pd.DataFrame, file_path: str, hindcast=False):
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    day = pd.to_datetime(df["date"]).dt.date
+    # get the date and the hour from the date column
+    day = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d %H:00")
     # Plot each column separately in matplotlib
     ax.plot(
         day,
@@ -223,7 +222,8 @@ def plot_bikes_prediction(
     # Set the labels and title
     ax.set_xlabel("Date")
     ax.set_title(
-        f"Bikes prediction in station C/ CIUTAT DE GRANADA, 168 | AV. DIAGONAL")
+        f"Bikes prediction in station C/ CIUTAT DE GRANADA, 168 | AV. DIAGONAL"
+    )
     ax.set_ylabel("Bikes")
 
     colors = ["red", "orange", "yellow", "green"]
@@ -239,8 +239,7 @@ def plot_bikes_prediction(
 
     # Add a legend for the different Air Quality Categories
     patches = [
-        Patch(color=colors[i],
-              label=f"{labels[i]}: {ranges[i][0]}-{ranges[i][1]}")
+        Patch(color=colors[i], label=f"{labels[i]}: {ranges[i][0]}-{ranges[i][1]}")
         for i in range(len(colors))
     ]
     legend1 = ax.legend(
@@ -251,8 +250,8 @@ def plot_bikes_prediction(
     )
 
     # Aim for ~10 annotated values on x-axis, will work for both forecasts ans hindcasts
-    if len(df.index) > 11:
-        every_x_tick = len(df.index) / 10
+    if len(df.index) > 5:
+        every_x_tick = len(df.index) / 4
         ax.xaxis.set_major_locator(MultipleLocator(every_x_tick))
 
     plt.xticks(rotation=45)
@@ -351,13 +350,17 @@ def backfill_predictions_for_monitoring(weather_fg, bikes_df, monitor_fg, model)
     features_df["predicted_num_bikes_available"] = model.predict(
         features_df[
             [
-                'is_weekend', 'is_holiday', 'prev_num_bikes_available', 'precipitation', 'temperature', 'time'
+                "is_weekend",
+                "is_holiday",
+                "prev_num_bikes_available",
+                "precipitation",
+                "temperature",
+                "time",
             ]
         ]
     )
     df = pd.merge(
-        features_df, bikes_df[[
-            "date", "pm25", "street", "country"]], on="date"
+        features_df, bikes_df[["date", "pm25", "street", "country"]], on="date"
     )
     df["days_before_forecast_day"] = 1
     hindcast_df = df
@@ -383,8 +386,7 @@ def fetch_station_data(url, authorization_token, target_station_id=42):
                 stations = stations_data["data"]["stations"]
 
                 filtered_station = next(
-                    (s for s in stations if s["station_id"]
-                     == target_station_id), None
+                    (s for s in stations if s["station_id"] == target_station_id), None
                 )
 
                 if filtered_station:
